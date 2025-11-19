@@ -1,5 +1,11 @@
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
+#include <ctype.h>
+
+#define MAX_CITIES 1000
+#define MAX_NAME 100
+#define LINE_BUF 256
 
 int main() {
     FILE *arquivo;
