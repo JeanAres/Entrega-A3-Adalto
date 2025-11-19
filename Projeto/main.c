@@ -2,6 +2,7 @@
 #include <string.h>
 #include <limits.h>
 #include <ctype.h>
+#include <stdlib.h>    // ADICIONADO para malloc, free, exit
 
 #define MAX_CITIES 1000
 #define MAX_NAME 100
@@ -84,24 +85,60 @@ int levenshtein(const char *s, const char *t) {
     return res;
 }
 
+int fuzzy_match_city(const char *input, char *matched_name_out) {
+    char temp_input[MAX_NAME];
+    strncpy(temp_input, input, MAX_NAME-1);
+    temp_input[MAX_NAME-1] = '\0';
+    str_to_lower_trim(temp_input);
 
+    int best_idx = -1;
+    int best_dist = INT_MAX;
+    for (int i=0; i<city_count; ++i) {
+        char tmp[MAX_NAME];
+        strncpy(tmp, city_names[i], MAX_NAME-1);
+        tmp[MAX_NAME-1] = '\0';
+        str_to_lower_trim(tmp);
+        int d = levenshtein(temp_input, tmp);
+        if (d < best_dist) {
+            best_dist = d;
+            best_idx = i;
+        }
+    }
+    if (best_idx >= 0) {
+        strncpy(matched_name_out, city_names[best_idx], MAX_NAME-1);
+        matched_name_out[MAX_NAME-1] = '\0';
+    }
+    return best_idx;
+}
 
+void dijkstra(int src, int dist[], int prev[]) {
+    for (int i=0;i<city_count;++i) { dist[i] = INT_MAX; prev[i] = -1; }
+    dist[src] = 0;
+    int visited[MAX_CITIES] = {0};
 
+    for (int it=0; it<city_count; ++it) {
+        int u = -1;
+        int best = INT_MAX;
+        for (int i=0;i<city_count;++i) if (!visited[i] && dist[i] < best) { best = dist[i]; u = i; }
+        if (u == -1) break;
+        visited[u] = 1;
+        for (Edge *e = adj[u]; e != NULL; e = e->next) {
+            int v = e->to;
+            int w = e->weight;
+            if (!visited[v] && dist[u] != INT_MAX && dist[u] + w < dist[v]) {
+                dist[v] = dist[u] + w;
+                prev[v] = u;
+            }
+        }
+    }
+}
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+int edge_weight_between(int a, int b) {
+    for (Edge *e = adj[a]; e != NULL; e = e->next) {
+        if (e->to == b) return e->weight;
+    }
+    return -1; 
+}
 
 int main() {
     FILE *arquivo;
