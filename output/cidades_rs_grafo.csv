@@ -1,0 +1,51 @@
+origem,destino,distancia
+Porto Alegre,Canoas,15
+Porto Alegre,Viamao,25
+Porto Alegre,Gravatai,30
+Porto Alegre,Alvorada,18
+Porto Alegre,Cachoeirinha,20
+Canoas,Esteio,8
+Canoas,Sapucaia do Sul,12
+Canoas,Gravatai,22
+Esteio,Sapucaia do Sul,5
+Esteio,Sao Leopoldo,10
+Sao Leopoldo,Novo Hamburgo,8
+Sao Leopoldo,Sapiranga,25
+Novo Hamburgo,Sapiranga,18
+Novo Hamburgo,Campo Bom,7
+Sapiranga,Parobe,10
+Campo Bom,Parobe,12
+Gravatai,Cachoeirinha,10
+Gravatai,Glorinha,28
+Alvorada,Viamao,12
+Viamao,Alvorada,12
+Caxias do Sul,Farroupilha,25
+Caxias do Sul,Bento Goncalves,42
+Caxias do Sul,Flores da Cunha,28
+Farroupilha,Bento Goncalves,20
+Bento Goncalves,Garibaldi,15
+Garibaldi,Carlos Barbosa,10
+Carlos Barbosa,Farroupilha,18
+Pelotas,Rio Grande,60
+Pelotas,Capao do Leao,15
+Rio Grande,Sao Jose do Norte,25
+Santa Maria,Julio de Castilhos,95
+Santa Maria,Cachoeira do Sul,105
+Santa Maria,Santiago,155
+Passo Fundo,Carazinho,45
+Passo Fundo,Marau,70
+Carazinho,Sarandi,35
+Uruguaiana,Alegrete,120
+Alegrete,Rosario do Sul,90
+Bage,Dom Pedrito,65
+Santa Cruz do Sul,Vera Cruz,35
+Santa Cruz do Sul,Venancio Aires,45
+Lajeado,Estrela,25
+Lajeado,Arroio do Meio,18
+Ijui,Santo Angelo,95
+Santo Angelo,Sao Luiz Gonzaga,75
+Cachoeira do Sul,Rio Pardo,88
+Rio Pardo,Pantano Grande,45
+Osorio,Tramandai,40
+Tramandai,Capao da Canoa,12
+Torres,Arroio do Sal,15
