@@ -2,31 +2,46 @@
 #include <string.h>
 #include <limits.h>
 #include <ctype.h>
-#include <stdlib.h>    // ADICIONADO para malloc, free, exit
+#include <stdlib.h>
 
 #define MAX_CITIES 1000
 #define MAX_NAME 100
-#define LINE_BUF 256
 
-
+// Estrutura de aresta (conexão)
 typedef struct Edge {
     int to;
     int weight;
     struct Edge *next;
 } Edge;
 
+// Estrutura auxiliar para ordenação (Opção 3)
+typedef struct {
+    int city_id;
+    int distance;
+} VizinhoInfo;
+
+// Estrutura auxiliar para contagem de conexões (Opção 2)
+typedef struct {
+    int city_id;
+    int count;
+    char name[MAX_NAME];
+} ConexaoCount;
+
+// Variáveis Globais do Grafo
 char city_names[MAX_CITIES][MAX_NAME];
 int city_count = 0;
 Edge *adj[MAX_CITIES] = {NULL};
 
+// --- Funções Utilitárias de String ---
+
 void str_to_lower_trim(char *s) {
     char *p = s;
     while (*p) {*p = tolower((unsigned char)*p); p++;}
-    char *start =s;
+    char *start = s;
     while (*start && isspace((unsigned char)*start)) start++;
     if (start != s) memmove(s, start, strlen(start)+1);
     int len = strlen(s);
-    while (len>0 && isspace((unsigned char)s[len-1])) s[--len] = '\0';
+    while (len > 0 && isspace((unsigned char)s[len-1])) s[--len] = '\0';
 }
 
 int city_index(const char *name_in) {
@@ -46,7 +61,7 @@ int city_index(const char *name_in) {
         fprintf(stderr, "ERRO: Numero maximo de cidades atingidos\n");
         exit(1);
     }
-    strncpy(city_names[city_count], name_in,MAX_NAME-1);
+    strncpy(city_names[city_count], name_in, MAX_NAME-1);
     city_names[city_count][MAX_NAME-1] = '\0';
     city_count++;
     return city_count - 1;
@@ -56,9 +71,10 @@ void add_edge(int a, int b, int w) {
     Edge *e1 = malloc(sizeof(Edge));
     e1->to = b; e1->weight = w; e1->next = adj[a]; adj[a] = e1;
     Edge *e2 = malloc(sizeof(Edge));
-    e2->to = a; e2->weight = w; e2->next = adj[b]; adj[b] =e2;
+    e2->to = a; e2->weight = w; e2->next = adj[b]; adj[b] = e2;
 }
 
+// Algoritmo de Levenshtein para busca aproximada
 int levenshtein(const char *s, const char *t) {
     int n = strlen(s), m = strlen(t);
     if (n == 0) return m;
@@ -93,22 +109,35 @@ int fuzzy_match_city(const char *input, char *matched_name_out) {
 
     int best_idx = -1;
     int best_dist = INT_MAX;
+    int threshold = strlen(temp_input) > 3 ? 4 : 2;
+
     for (int i=0; i<city_count; ++i) {
         char tmp[MAX_NAME];
         strncpy(tmp, city_names[i], MAX_NAME-1);
         tmp[MAX_NAME-1] = '\0';
         str_to_lower_trim(tmp);
+
+        if (strstr(tmp, temp_input) != NULL) {
+             best_dist = 0;
+             best_idx = i;
+             break;
+        }
+
         int d = levenshtein(temp_input, tmp);
         if (d < best_dist) {
             best_dist = d;
             best_idx = i;
         }
     }
-    if (best_idx >= 0) {
-        strncpy(matched_name_out, city_names[best_idx], MAX_NAME-1);
-        matched_name_out[MAX_NAME-1] = '\0';
+
+    if (best_idx >= 0 && best_dist <= threshold) {
+        if (matched_name_out) {
+            strncpy(matched_name_out, city_names[best_idx], MAX_NAME-1);
+            matched_name_out[MAX_NAME-1] = '\0';
+        }
+        return best_idx;
     }
-    return best_idx;
+    return -1;
 }
 
 void dijkstra(int src, int dist[], int prev[]) {
@@ -133,51 +162,224 @@ void dijkstra(int src, int dist[], int prev[]) {
     }
 }
 
-int edge_weight_between(int a, int b) {
-    for (Edge *e = adj[a]; e != NULL; e = e->next) {
-        if (e->to == b) return e->weight;
+int compare_vizinhos(const void *a, const void *b) {
+    VizinhoInfo *va = (VizinhoInfo *)a;
+    VizinhoInfo *vb = (VizinhoInfo *)b;
+    return va->distance - vb->distance;
+}
+
+int compare_conexoes(const void *a, const void *b) {
+    ConexaoCount *ca = (ConexaoCount *)a;
+    ConexaoCount *cb = (ConexaoCount *)b;
+    if (ca->count != cb->count) return ca->count - cb->count;
+    return strcmp(ca->name, cb->name);
+}
+
+// --- Funções do Menu ---
+
+void menu_listar_cidades() {
+    printf("\n--- Cidades Cadastradas (%d) ---\n", city_count);
+    for(int i = 0; i < city_count; i++) {
+        printf("%d. %s\n", i + 1, city_names[i]);
     }
-    return -1; 
+    printf("---------------------------------\n");
+}
+
+void menu_contar_conexoes() {
+    printf("\n--- Numero de Conexoes por Cidade (Ordem Crescente) ---\n");
+    ConexaoCount lista[MAX_CITIES];
+    for(int i = 0; i < city_count; i++) {
+        int count = 0;
+        for(Edge *e = adj[i]; e != NULL; e = e->next) count++;
+        lista[i].city_id = i;
+        lista[i].count = count;
+        strcpy(lista[i].name, city_names[i]);
+    }
+    qsort(lista, city_count, sizeof(ConexaoCount), compare_conexoes);
+    for(int i = 0; i < city_count; i++) {
+        printf("%s: %d conexoes\n", lista[i].name, lista[i].count);
+    }
+    printf("-------------------------------------------------------\n");
+}
+
+int ler_cidade_input(char *prompt) {
+    char input[MAX_NAME];
+    char matched_name[MAX_NAME];
+    int idx = -1;
+    do {
+        printf("%s", prompt);
+        if (fgets(input, sizeof(input), stdin) == NULL) return -1;
+        input[strcspn(input, "\n")] = 0;
+        idx = fuzzy_match_city(input, matched_name);
+        if (idx == -1) printf("Cidade '%s' nao encontrada ou ambigua. Tente novamente.\n", input);
+        else printf("-> Selecionado: %s\n", matched_name);
+    } while (idx == -1);
+    return idx;
+}
+
+void menu_conexoes_ordenadas() {
+    int cidade_idx = ler_cidade_input("\nDigite o nome da cidade para ver vizinhos: ");
+    if (cidade_idx == -1) return;
+
+    VizinhoInfo vizinhos[MAX_CITIES];
+    int count = 0;
+    for(Edge *e = adj[cidade_idx]; e != NULL; e = e->next) {
+        vizinhos[count].city_id = e->to;
+        vizinhos[count].distance = e->weight;
+        count++;
+    }
+
+    if (count == 0) {
+        printf("Esta cidade nao possui conexoes diretas.\n");
+        return;
+    }
+
+    qsort(vizinhos, count, sizeof(VizinhoInfo), compare_vizinhos);
+
+    printf("\nConexoes de %s (por distancia):\n", city_names[cidade_idx]);
+    for(int i = 0; i < count; i++) {
+        printf("%d. %s (%d km)\n", i+1, city_names[vizinhos[i].city_id], vizinhos[i].distance);
+    }
+}
+
+void menu_distancia_entre_cidades() {
+    printf("\n--- Calcular Distancia e Trajeto ---\n");
+    int origem = ler_cidade_input("Cidade de Origem: ");
+    int destino = ler_cidade_input("Cidade de Destino: ");
+
+    if (origem == destino) {
+        printf("Distancia: 0 km (mesma cidade).\n");
+        return;
+    }
+
+    int dist[MAX_CITIES], prev[MAX_CITIES];
+    dijkstra(origem, dist, prev);
+
+    if (dist[destino] == INT_MAX) {
+        printf("Nao ha caminho registrado entre %s e %s.\n", city_names[origem], city_names[destino]);
+    } else {
+        printf("\nMenor distancia entre %s e %s: %d km\n", city_names[origem], city_names[destino], dist[destino]);
+        printf("Trajeto a ser percorrido: ");
+        int caminho[MAX_CITIES];
+        int tam_caminho = 0;
+        int atual = destino;
+        while (atual != -1) {
+            caminho[tam_caminho++] = atual;
+            atual = prev[atual];
+        }
+        for(int i = tam_caminho - 1; i >= 0; i--) {
+            printf("%s", city_names[caminho[i]]);
+            if (i > 0) printf(" -> ");
+        }
+        printf("\n");
+    }
+}
+
+// 5) Criar nova conexão (AGORA SALVA NO CSV)
+void menu_nova_conexao() {
+    printf("\n--- Criar Nova Conexao e Salvar ---\n");
+
+    char buffer[MAX_NAME];
+    printf("Nome da primeira cidade: ");
+    fgets(buffer, sizeof(buffer), stdin);
+    buffer[strcspn(buffer, "\n")] = 0;
+    int id1 = city_index(buffer);
+
+    printf("Nome da segunda cidade: ");
+    fgets(buffer, sizeof(buffer), stdin);
+    buffer[strcspn(buffer, "\n")] = 0;
+    int id2 = city_index(buffer);
+
+    if (id1 == id2) {
+        printf("Erro: As cidades devem ser diferentes.\n");
+        return;
+    }
+
+    int dist;
+    printf("Distancia (km): ");
+    scanf("%d", &dist);
+    while(getchar() != '\n');
+
+    // 1. Adiciona no grafo em memória
+    add_edge(id1, id2, dist);
+
+    // 2. Salva no arquivo CSV
+    FILE *f = fopen("cidades_rs_grafo.csv", "a"); // "a" para append (adicionar ao final)
+    if (f == NULL) {
+        printf("ERRO: Conexao criada na memoria, mas falha ao abrir arquivo para salvar!\n");
+    } else {
+        // Escreve no formato Origem,Destino,Distancia
+        fprintf(f, "%s,%s,%d\n", city_names[id1], city_names[id2], dist);
+        fclose(f);
+        printf("Sucesso! Dados salvos em 'cidades_rs_grafo.csv'.\n");
+    }
+
+    printf("Conexao criada: %s <--> %s (%d km)\n", city_names[id1], city_names[id2], dist);
 }
 
 int main() {
     FILE *arquivo;
     char origem[50], destino[50];
     int distancia;
-    int contador = 0;
-    
-    // Abre o arquivo CSV
+
     arquivo = fopen("cidades_rs_grafo.csv", "r");
 
-    // Verifica se o arquivo foi aberto com sucesso
     if (arquivo == NULL) {
-        printf("ERRO: Nao foi possivel abrir o arquivo!\n");
-        printf("Certifique-se de que 'cidades_rs_grafo.csv' esta na mesma pasta do executavel.\n");
+        printf("ERRO CRITICO: Arquivo 'cidades_rs_grafo.csv' nao encontrado.\n");
+        // Opcional: Criar o arquivo se não existir, para começar do zero
+        // arquivo = fopen("cidades_rs_grafo.csv", "w");
+        // fprintf(arquivo, "origem,destino,distancia\n");
+        // fclose(arquivo);
         return 1;
     }
-    
-    printf("Arquivo aberto com sucesso!\n");
-    printf("=========================================\n\n");
-    
-    // Ignora a primeira linha (cabeçalho)
+
+    printf("Carregando grafo...\n");
     char cabecalho[150];
     fgets(cabecalho, sizeof(cabecalho), arquivo);
-    
-    printf("Lendo conexoes entre cidades:\n\n");
-    
-    // Lê cada linha do arquivo
-    while (fscanf(arquivo, " %[^,],%[^,],%d\n", origem, destino, &distancia) == 3) {
-        contador++;
-        printf("%2d. %s -> %s = %d km\n", contador, origem, destino, distancia);
+
+    while (fscanf(arquivo, " %[^,],%[^,],%d", origem, destino, &distancia) == 3) {
+        int id_origem = city_index(origem);
+        int id_destino = city_index(destino);
+        add_edge(id_origem, id_destino, distancia);
     }
-    
-    printf("\n=========================================\n");
-    printf("Total de conexoes lidas: %d\n", contador);
-    
-    // Fecha o arquivo
     fclose(arquivo);
-    
-    printf("\nLeitura concluida com sucesso!\n");
-    
+    printf("Dados carregados! Total de cidades: %d\n", city_count);
+
+    int opcao = 0;
+
+    do {
+        printf("\n================ MENU ================\n");
+        printf("1) Mostrar todas as cidades cadastradas\n");
+        printf("2) Numero de conexoes por cidade (Ordenado)\n");
+        printf("3) Ver conexoes de uma cidade (Por Distancia)\n");
+        printf("4) Calcular distancia e trajeto entre cidades\n");
+        printf("5) Criar nova conexao (Salvar no CSV)\n");
+        printf("0) Sair\n");
+        printf("======================================\n");
+        printf("Escolha uma opcao: ");
+
+        if (scanf("%d", &opcao) != 1) {
+            while(getchar() != '\n');
+            opcao = -1;
+        }
+        while(getchar() != '\n');
+
+        switch (opcao) {
+            case 1: menu_listar_cidades(); break;
+            case 2: menu_contar_conexoes(); break;
+            case 3: menu_conexoes_ordenadas(); break;
+            case 4: menu_distancia_entre_cidades(); break;
+            case 5: menu_nova_conexao(); break;
+            case 0: printf("Saindo do sistema...\n"); break;
+            default: printf("Opcao invalida!\n");
+        }
+        
+        if (opcao != 0) {
+            printf("\nPressione ENTER para continuar...");
+            getchar();
+        }
+        
+    } while (opcao != 0);
+
     return 0;
 }
