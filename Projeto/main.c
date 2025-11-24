@@ -7,20 +7,20 @@
 #define MAX_CITIES 1000
 #define MAX_NAME 100
 
-// Estrutura de aresta 
+// aresta (lista ligada)
 typedef struct Edge {
     int to;
     int weight;
     struct Edge *next;
 } Edge;
 
-// Opção 3
+// estrutura usada pra listar vizinhos (opção 3)
 typedef struct {
     int city_id;
     int distance;
 } VizinhoInfo;
 
-// Opção 2
+// estrutura pra contar conexões (opção 2)
 typedef struct {
     int city_id;
     int count;
@@ -31,8 +31,9 @@ char city_names[MAX_CITIES][MAX_NAME];
 int city_count = 0;
 Edge *adj[MAX_CITIES] = {NULL};
 
-// --- Funções Utilitárias de String ---
+/* --- utilitárias de string --- */
 
+// normalizo para minúsculas e tiro espaços nas pontas
 void str_to_lower_trim(char *s) {
     char *p = s;
     while (*p) {*p = tolower((unsigned char)*p); p++;}
@@ -43,6 +44,7 @@ void str_to_lower_trim(char *s) {
     while (len > 0 && isspace((unsigned char)s[len-1])) s[--len] = '\0';
 }
 
+// retorna índice da cidade (cria se não existir)
 int city_index(const char *name_in) {
     char name[MAX_NAME];
     strncpy(name, name_in, MAX_NAME-1);
@@ -66,6 +68,7 @@ int city_index(const char *name_in) {
     return city_count - 1;
 }
 
+// adiciona aresta (grafo não direcionado)
 void add_edge(int a, int b, int w) {
     Edge *e1 = malloc(sizeof(Edge));
     e1->to = b; e1->weight = w; e1->next = adj[a]; adj[a] = e1;
@@ -73,7 +76,7 @@ void add_edge(int a, int b, int w) {
     e2->to = a; e2->weight = w; e2->next = adj[b]; adj[b] = e2;
 }
 
-// Algoritmo de Levenshtein para busca aproximada
+/* Levenshtein - usado pra busca aproximada de nomes */
 int levenshtein(const char *s, const char *t) {
     int n = strlen(s), m = strlen(t);
     if (n == 0) return m;
@@ -100,6 +103,7 @@ int levenshtein(const char *s, const char *t) {
     return res;
 }
 
+/* Busca aproximada: tenta achar cidade pelo input do usuário */
 int fuzzy_match_city(const char *input, char *matched_name_out) {
     char temp_input[MAX_NAME];
     strncpy(temp_input, input, MAX_NAME-1);
@@ -139,6 +143,7 @@ int fuzzy_match_city(const char *input, char *matched_name_out) {
     return -1;
 }
 
+/* Dijkstra (menor distância) */
 void dijkstra(int src, int dist[], int prev[]) {
     for (int i=0;i<city_count;++i) { dist[i] = INT_MAX; prev[i] = -1; }
     dist[src] = 0;
@@ -174,6 +179,8 @@ int compare_conexoes(const void *a, const void *b) {
     return strcmp(ca->name, cb->name);
 }
 
+/* --- menus simples --- */
+
 void menu_listar_cidades() {
     printf("\n--- Cidades Cadastradas (%d) ---\n", city_count);
     for (int i = 0; i < city_count; i++) {
@@ -183,7 +190,6 @@ void menu_listar_cidades() {
 }
 
 void menu_contar_conexoes() {
-    printf("\n--- Numero de Conexoes por Cidade (Ordem Crescente) ---\n");
     ConexaoCount lista[MAX_CITIES];
     for (int i = 0; i < city_count; i++) {
         int count = 0;
@@ -193,12 +199,14 @@ void menu_contar_conexoes() {
         strcpy(lista[i].name, city_names[i]);
     }
     qsort(lista, city_count, sizeof(ConexaoCount), compare_conexoes);
+    printf("\n--- Numero de Conexoes por Cidade (Ordem Crescente) ---\n");
     for (int i = 0; i < city_count; i++) {
         printf("%s: %d conexoes\n", lista[i].name, lista[i].count);
     }
     printf("-------------------------------------------------------\n");
 }
 
+/* Lê cidade do usuário com fuzzy match */
 int ler_cidade_input(char *prompt) {
     char input[MAX_NAME];
     char matched_name[MAX_NAME];
@@ -214,6 +222,7 @@ int ler_cidade_input(char *prompt) {
     return idx;
 }
 
+/* Mostra conexões de uma cidade, ordenadas por distância */
 void menu_conexoes_ordenadas() {
     int cidade_idx = ler_cidade_input("\nDigite o nome da cidade para ver vizinhos: ");
     if (cidade_idx == -1) return;
@@ -239,8 +248,9 @@ void menu_conexoes_ordenadas() {
     }
 }
 
-// ---  funções auxiliares para detectar componentes e reconstruir caminhos ---
+/* --- auxiliars para componentes e reconstrução de caminho --- */
 
+// marca componente por DFS
 void dfs_mark_component(int u, int comp_id, int comp[]) {
     comp[u] = comp_id;
     for (Edge *e = adj[u]; e != NULL; e = e->next) {
@@ -248,10 +258,8 @@ void dfs_mark_component(int u, int comp_id, int comp[]) {
     }
 }
 
-// Reconstrói caminho a partir do array prev (prev é como em Dijkstra)
+// reconstrói caminho usando array prev (retorna tamanho; ordem from->to)
 int reconstruct_path(int prev[], int from, int to, int caminho[]) {
-    // prev: predecessor array      from: origem do run    to: nó final
-    // retorna tamanho do caminho preenchido em caminho[0..tam-1] (ordem from->to)
     int tam = 0;
     int cur = to;
     while (cur != -1) {
@@ -259,9 +267,7 @@ int reconstruct_path(int prev[], int from, int to, int caminho[]) {
         if (cur == from) break;
         cur = prev[cur];
     }
-    // Se não encontramos 'from' no encadeamento, retorna 0
     if (tam == 0 || caminho[tam-1] != from) return 0;
-    // inverter para ficar from -> ... -> to
     for (int i = 0; i < tam/2; ++i) {
         int tmp = caminho[i];
         caminho[i] = caminho[tam-1-i];
@@ -270,6 +276,7 @@ int reconstruct_path(int prev[], int from, int to, int caminho[]) {
     return tam;
 }
 
+/* Opção 4: calcula distância/trajeto; sugere rota parcial se componentes diferentes */
 void menu_distancia_entre_cidades() {
     printf("\n--- Calcular Distancia e Trajeto ---\n");
     int origem = ler_cidade_input("Cidade de Origem: ");
@@ -284,7 +291,7 @@ void menu_distancia_entre_cidades() {
     dijkstra(origem, dist, prev);
 
     if (dist[destino] != INT_MAX) {
-        // Há caminho completo dentro do mesmo componente
+        // caminho completo existe
         printf("\nMenor distancia entre %s e %s: %d km\n", city_names[origem], city_names[destino], dist[destino]);
         printf("Trajeto a ser percorrido: ");
         int caminho[MAX_CITIES];
@@ -302,6 +309,7 @@ void menu_distancia_entre_cidades() {
         return;
     }
 
+    // componentes diferentes: identifico componentes
     int comp[MAX_CITIES];
     for (int i = 0; i < city_count; ++i) comp[i] = -1;
     int comp_id = 0;
@@ -316,17 +324,17 @@ void menu_distancia_entre_cidades() {
     int comp_destino = comp[destino];
 
     if (comp_origem == comp_destino) {
+        // caso raro, trato como sem caminho
         printf("Nao ha caminho registrado entre %s e %s.\n", city_names[origem], city_names[destino]);
         return;
     }
 
-    // Encontra o par (u,v) com menor Levenshtein entre nomes, u em comp_origem, v em comp_destino
+    // escolho par (u,v) entre componentes com heurística (Levenshtein nos nomes)
     int best_u = -1, best_v = -1, best_lev = INT_MAX;
     for (int u = 0; u < city_count; ++u) {
         if (comp[u] != comp_origem) continue;
         for (int v = 0; v < city_count; ++v) {
             if (comp[v] != comp_destino) continue;
-            // compara nomes normalizados
             char a[MAX_NAME], b[MAX_NAME];
             strncpy(a, city_names[u], MAX_NAME-1); a[MAX_NAME-1] = '\0';
             strncpy(b, city_names[v], MAX_NAME-1); b[MAX_NAME-1] = '\0';
@@ -336,36 +344,27 @@ void menu_distancia_entre_cidades() {
         }
     }
 
-    // Reconstruir o caminho interno da componente da origem até best_u
-    // Para isso, rodamos Dijkstra novamente com origem original (já temos dist/prev do início)
+    // caminho da origem até best_u (já tenho prev do Dijkstra com origem)
     int caminho_a[MAX_CITIES], tam_a = reconstruct_path(prev, origem, best_u, caminho_a);
 
-    // Reconstruir o caminho interno da componente do destino desde best_v até destino
-    // Necessitamos rodar Dijkstra com source = best_v dentro do componente do destino
+    // caminho de best_v até destino (rodo Dijkstra com source = best_v)
     int dist2[MAX_CITIES], prev2[MAX_CITIES];
     dijkstra(best_v, dist2, prev2);
     int caminho_b[MAX_CITIES], tam_b = reconstruct_path(prev2, best_v, destino, caminho_b);
 
-    // Imprime sugestao de rota parcial com nota de falta de ligacao entre best_u e best_v
+    // exibo sugestão parcial e aviso que falta ligação entre best_u e best_v
     printf("\nNao existe caminho completo registrado entre %s e %s.\n", city_names[origem], city_names[destino]);
     if (best_u != -1 && best_v != -1 && tam_a > 0 && tam_b > 0) {
         printf("Sugestao parcial (componentes distintos):\n");
-        // imprime segmento A
         for (int i = 0; i < tam_a; ++i) {
             printf("%s", city_names[caminho_a[i]]);
             if (i < tam_a - 1) printf(" -> ");
         }
-        printf("  ");
-        printf("\nFALTA LIGACAO ENTRE '%s' E '%s' \n", city_names[best_u], city_names[best_v]);
+        printf("\nFALTA LIGACAO ENTRE '%s' E '%s'\n", city_names[best_u], city_names[best_v]);
         printf("Para completar o trajeto, seria necessario ligar essas duas cidades.\n");
-        // imprime segmento B
         for (int i = 0; i < tam_b; ++i) {
-            if (i == 0) {
-                // se quiser, mostrar que aqui começa a outra componente
-                printf("%s", city_names[caminho_b[i]]);
-            } else {
-                printf(" -> %s", city_names[caminho_b[i]]);
-            }
+            if (i == 0) printf("%s", city_names[caminho_b[i]]);
+            else printf(" -> %s", city_names[caminho_b[i]]);
         }
         printf("\n");
     } else {
@@ -373,10 +372,11 @@ void menu_distancia_entre_cidades() {
     }
 }
 
+/* cria nova conexão (menu 5) e persiste no CSV */
 void menu_nova_conexao() {
+    char buffer[MAX_NAME];
     printf("\n--- Criar Nova Conexao e Salvar ---\n");
 
-    char buffer[MAX_NAME];
     printf("Nome da primeira cidade: ");
     fgets(buffer, sizeof(buffer), stdin);
     buffer[strcspn(buffer, "\n")] = 0;
@@ -397,15 +397,12 @@ void menu_nova_conexao() {
     scanf("%d", &dist);
     while (getchar() != '\n');
 
-    // 1. Adiciona no grafo em memória
     add_edge(id1, id2, dist);
 
-    // 2. Salva no arquivo CSV
-    FILE *f = fopen("cidades_rs_grafo.csv", "a"); // "a" para append (adicionar ao final)
+    FILE *f = fopen("cidades_rs_grafo.csv", "a");
     if (f == NULL) {
         printf("ERRO: Conexao criada na memoria, mas falha ao abrir arquivo para salvar!\n");
     } else {
-        // Escreve no formato Origem,Destino,Distancia
         fprintf(f, "%s,%s,%d\n", city_names[id1], city_names[id2], dist);
         fclose(f);
         printf("Sucesso! Dados salvos em 'cidades_rs_grafo.csv'.\n");
@@ -414,6 +411,7 @@ void menu_nova_conexao() {
     printf("Conexao criada: %s <--> %s (%d km)\n", city_names[id1], city_names[id2], dist);
 }
 
+/* main: carrega CSV e mostra menu */
 int main() {
     FILE *arquivo;
     char origem[50], destino[50];
